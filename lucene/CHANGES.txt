@@ -71,6 +71,9 @@ API Changes
   the entire segment should be scored. Subclasses that override the method should instead override its replacement.
   (Luca Cavanna)
 
+* GITHUB#13219: The `readOnce`, `load` and `random` flags on `IOContext` have
+  been replaced with a new `ReadAdvice` enum. (Adrien Grand)
+
 New Features
 ---------------------
 

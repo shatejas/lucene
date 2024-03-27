@@ -54,7 +54,7 @@ public class VariableGapTermsIndexReader extends TermsIndexReaderBase {
             state.segmentInfo.name,
             state.segmentSuffix,
             VariableGapTermsIndexWriter.TERMS_INDEX_EXTENSION);
-    final IndexInput in = state.directory.openInput(fileName, new IOContext(state.context, true));
+    final IndexInput in = state.directory.openInput(fileName, IOContext.READONCE);
     boolean success = false;
 
     try {
