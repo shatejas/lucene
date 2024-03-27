@@ -16,6 +16,9 @@
  */
 package org.apache.lucene.store;
 
+import static org.apache.lucene.store.ReadAdvice.RANDOM;
+import static org.apache.lucene.store.ReadAdvice.SEQUENTIAL;
+
 import java.io.IOException;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -26,7 +29,6 @@ import java.lang.invoke.MethodHandle;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Logger;
-import org.apache.lucene.store.IOContext.Context;
 
 @SuppressWarnings("preview")
 final class PosixNativeAccess extends NativeAccess {
@@ -110,12 +112,12 @@ final class PosixNativeAccess extends NativeAccess {
   }
 
   @Override
-  public void madvise(MemorySegment segment, IOContext context) throws IOException {
+  public void madvise(MemorySegment segment, ReadAdvice readAdvice) throws IOException {
     // Note: madvise is bypassed if the segment should be preloaded via MemorySegment#load.
     if (segment.byteSize() == 0L) {
       return; // empty segments should be excluded, because they may have no address at all
     }
-    final Integer advice = mapIOContext(context);
+    final Integer advice = mapReadAdvice(readAdvice);
     if (advice == null) {
       return; // do nothing
     }
@@ -136,16 +138,12 @@ final class PosixNativeAccess extends NativeAccess {
     }
   }
 
-  private Integer mapIOContext(IOContext ctx) {
-    // Merging always wins and implies sequential access, because kernel is advised to free pages
-    // after use:
-    if (ctx.context == Context.MERGE) {
-      return POSIX_MADV_SEQUENTIAL;
-    }
-    if (ctx.randomAccess) {
+  private Integer mapReadAdvice(ReadAdvice readAdvice) {
+    if (readAdvice == RANDOM) {
       return POSIX_MADV_RANDOM;
     }
-    if (ctx.readOnce) {
+
+    if (readAdvice == SEQUENTIAL) {
       return POSIX_MADV_SEQUENTIAL;
     }
     return null;

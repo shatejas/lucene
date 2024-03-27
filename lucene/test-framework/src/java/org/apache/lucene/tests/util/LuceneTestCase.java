@@ -1830,6 +1830,9 @@ public abstract class LuceneTestCase extends Assert {
 
   /** TODO: javadoc */
   public static IOContext newIOContext(Random random, IOContext oldContext) {
+    if (oldContext == IOContext.READONCE) {
+      return oldContext; // don't mess with readOnce contexts
+    }
     final int randomNumDocs = random.nextInt(4192);
     final int size = random.nextInt(512) * randomNumDocs;
     if (oldContext.flushInfo != null) {
@@ -1847,9 +1850,9 @@ public abstract class LuceneTestCase extends Assert {
               random.nextBoolean(),
               TestUtil.nextInt(random, 1, 100)));
     } else {
-      // Make a totally random IOContext:
+      // Make a totally random IOContext, except READONCE which has semantic implications
       final IOContext context;
-      switch (random.nextInt(5)) {
+      switch (random.nextInt(4)) {
         case 0:
           context = IOContext.DEFAULT;
           break;
@@ -1857,12 +1860,9 @@ public abstract class LuceneTestCase extends Assert {
           context = IOContext.READ;
           break;
         case 2:
-          context = IOContext.READONCE;
-          break;
-        case 3:
           context = new IOContext(new MergeInfo(randomNumDocs, size, true, -1));
           break;
-        case 4:
+        case 3:
           context = new IOContext(new FlushInfo(randomNumDocs, size));
           break;
         default:
@@ -3060,7 +3060,7 @@ public abstract class LuceneTestCase extends Assert {
    */
   public static boolean slowFileExists(Directory dir, String fileName) throws IOException {
     try {
-      dir.openInput(fileName, IOContext.DEFAULT).close();
+      dir.openInput(fileName, IOContext.READONCE).close();
       return true;
     } catch (@SuppressWarnings("unused") NoSuchFileException | FileNotFoundException e) {
       return false;

@@ -16,6 +16,7 @@
  */
 package org.apache.lucene.store;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -25,7 +26,6 @@ import java.util.Objects;
  * org.apache.lucene.store.Directory#createOutput(String, IOContext)}
  */
 public class IOContext {
-
   /**
    * Context is a enumerator which specifies the context in which the Directory is being used for.
    */
@@ -43,117 +43,51 @@ public class IOContext {
 
   public final FlushInfo flushInfo;
 
-  /** This flag indicates that the file will be opened, then fully read sequentially then closed. */
-  public final boolean readOnce;
+  public final ReadAdvice readAdvice;
 
-  /**
-   * This flag indicates that the file will be accessed randomly. If this flag is set, then readOnce
-   * will be false.
-   */
-  public final boolean randomAccess;
+  public static final IOContext DEFAULT =
+      new IOContext(Context.DEFAULT, null, null, ReadAdvice.NORMAL);
 
-  /**
-   * This flag is used for files that are a small fraction of the total index size and are expected
-   * to be heavily accessed in random-access fashion. Some {@link Directory} implementations may
-   * choose to load such files into physical memory (e.g. Java heap) as a way to provide stronger
-   * guarantees on query latency. If this flag is set, then {@link #randomAccess} will be true.
-   */
-  public final boolean load;
+  public static final IOContext READONCE = new IOContext(ReadAdvice.SEQUENTIAL);
 
-  public static final IOContext DEFAULT = new IOContext(Context.DEFAULT);
+  public static final IOContext READ = new IOContext(ReadAdvice.NORMAL);
 
-  public static final IOContext READONCE = new IOContext(true, false, false);
+  public static final IOContext PRELOAD = new IOContext(ReadAdvice.RANDOM_PRELOAD);
 
-  public static final IOContext READ = new IOContext(false, false, false);
+  public static final IOContext RANDOM = new IOContext(ReadAdvice.RANDOM);
 
-  public static final IOContext LOAD = new IOContext(false, true, true);
-
-  public static final IOContext RANDOM = new IOContext(false, false, true);
-
-  public IOContext() {
-    this(false, false, false);
-  }
-
-  public IOContext(FlushInfo flushInfo) {
-    assert flushInfo != null;
-    this.context = Context.FLUSH;
-    this.mergeInfo = null;
-    this.readOnce = false;
-    this.load = false;
-    this.randomAccess = false;
-    this.flushInfo = flushInfo;
-  }
-
-  public IOContext(Context context) {
-    this(context, null);
-  }
-
-  private IOContext(boolean readOnce, boolean load, boolean randomAccess) {
-    if (readOnce && randomAccess) {
-      throw new IllegalArgumentException("cannot be both readOnce and randomAccess");
+  private IOContext(
+      Context context, MergeInfo mergeInfo, FlushInfo flushInfo, ReadAdvice readAdvice) {
+    Objects.requireNonNull(context, "context must not be null");
+    Objects.requireNonNull(readAdvice, "readAdvice must not be null");
+    switch (context) {
+      case MERGE:
+        Objects.requireNonNull(mergeInfo, "mergeInfo must not be null if context is MERGE");
+        break;
+      case FLUSH:
+        Objects.requireNonNull(flushInfo, "flushInfo must not be null if context is FLUSH");
+        break;
+      case READ:
+      case DEFAULT:
     }
-    if (load && randomAccess == false) {
-      throw new IllegalArgumentException("cannot be load but not randomAccess");
+    if (context == Context.MERGE && readAdvice != ReadAdvice.SEQUENTIAL) {
+      throw new IllegalArgumentException(
+          "The MERGE context must use the SEQUENTIAL read access advice");
     }
-    this.context = Context.READ;
-    this.mergeInfo = null;
-    this.readOnce = readOnce;
-    this.load = load;
-    this.randomAccess = randomAccess;
-    this.flushInfo = null;
-  }
-
-  public IOContext(MergeInfo mergeInfo) {
-    this(Context.MERGE, mergeInfo);
-  }
-
-  private IOContext(Context context, MergeInfo mergeInfo) {
-    assert context != Context.MERGE || mergeInfo != null
-        : "MergeInfo must not be null if context is MERGE";
-    assert context != Context.FLUSH : "Use IOContext(FlushInfo) to create a FLUSH IOContext";
+    if ((context == Context.FLUSH || context == Context.DEFAULT)
+        && readAdvice != ReadAdvice.NORMAL) {
+      throw new IllegalArgumentException(
+          "The FLUSH and DEFAULT contexts must use the NORMAL read access advice");
+    }
     this.context = context;
-    this.readOnce = false;
-    this.load = false;
-    this.randomAccess = false;
     this.mergeInfo = mergeInfo;
-    this.flushInfo = null;
-  }
-
-  /**
-   * This constructor is used to initialize a {@link IOContext} instance with a new value for the
-   * readOnce variable. This automatically sets {@link #randomAccess} and {@link #load} to {@code
-   * false}.
-   *
-   * @param ctxt {@link IOContext} object whose information is used to create the new instance
-   *     except the readOnce variable.
-   * @param readOnce The new {@link IOContext} object will use this value for readOnce.
-   */
-  public IOContext(IOContext ctxt, boolean readOnce) {
-    this.context = ctxt.context;
-    this.mergeInfo = ctxt.mergeInfo;
-    this.flushInfo = ctxt.flushInfo;
-    this.readOnce = readOnce;
-    this.randomAccess = false;
-    this.load = false;
-  }
-
-  /**
-   * Return an updated {@link IOContext} that has {@link IOContext#randomAccess} set to true if
-   * {@link IOContext#context} is {@link Context#READ} or {@link Context#DEFAULT}. Otherwise, this
-   * returns this instance. This helps preserve sequential access for merging, which is always the
-   * right choice, while allowing {@link IndexInput}s open for searching to use random access.
-   */
-  public IOContext withRandomAccess() {
-    if (context == Context.READ || context == Context.DEFAULT) {
-      return RANDOM;
-    } else {
-      return this;
-    }
+    this.flushInfo = flushInfo;
+    this.readAdvice = readAdvice;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(context, flushInfo, mergeInfo, readOnce, load, randomAccess);
+    return Objects.hash(context, flushInfo, mergeInfo, readAdvice);
   }
 
   @Override
@@ -165,9 +99,7 @@ public class IOContext {
     if (context != other.context) return false;
     if (!Objects.equals(flushInfo, other.flushInfo)) return false;
     if (!Objects.equals(mergeInfo, other.mergeInfo)) return false;
-    if (readOnce != other.readOnce) return false;
-    if (load != other.load) return false;
-    if (randomAccess != other.randomAccess) return false;
+    if (readAdvice != other.readAdvice) return false;
     return true;
   }
 
@@ -179,12 +111,40 @@ public class IOContext {
         + mergeInfo
         + ", flushInfo="
         + flushInfo
-        + ", readOnce="
-        + readOnce
-        + ", load="
-        + load
-        + ", randomAccess="
-        + randomAccess
-        + "]";
+        + ", readAdvice="
+        + readAdvice;
+  }
+
+  private IOContext(ReadAdvice accessAdvice) {
+    this(Context.READ, null, null, accessAdvice);
+  }
+
+  /** Creates an IOContext for flushing. */
+  public IOContext(FlushInfo flushInfo) {
+    this(Context.FLUSH, null, flushInfo, ReadAdvice.NORMAL);
+  }
+
+  /** Creates an IOContext for merging. */
+  public IOContext(MergeInfo mergeInfo) {
+    // Merges read input segments sequentially.
+    this(Context.MERGE, mergeInfo, null, ReadAdvice.SEQUENTIAL);
+  }
+
+  private static final IOContext[] READADVICE_TO_IOCONTEXT =
+      Arrays.stream(ReadAdvice.values()).map(IOContext::new).toArray(IOContext[]::new);
+
+  /**
+   * Return an updated {@link IOContext} that has the provided {@link ReadAdvice} if the {@link
+   * Context} is a {@link Context#DEFAULT} context, otherwise return this existing instance. This
+   * helps preserve a {@link ReadAdvice#SEQUENTIAL} advice for merging, which is always the right
+   * choice, while allowing {@link IndexInput}s open for searching to use arbitrary {@link
+   * ReadAdvice}s.
+   */
+  public IOContext withReadAdvice(ReadAdvice advice) {
+    if (context == Context.DEFAULT) {
+      return READADVICE_TO_IOCONTEXT[advice.ordinal()];
+    } else {
+      return this;
+    }
   }
 }
