@@ -167,7 +167,7 @@ final class PosixNativeAccess extends NativeAccess {
     if (readAdvice == SEQUENTIAL) {
       return POSIX_MADV_SEQUENTIAL;
     }
-    return null;
+    return POSIX_MADV_NORMAL;
   }
 
   @Override
