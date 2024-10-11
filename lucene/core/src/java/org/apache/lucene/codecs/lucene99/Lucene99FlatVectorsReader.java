@@ -58,10 +58,12 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
 
   private final Map<String, FieldEntry> fields = new HashMap<>();
   private final IndexInput vectorData;
+  private final SegmentReadState segmentReadState;
 
   public Lucene99FlatVectorsReader(SegmentReadState state, FlatVectorsScorer scorer)
       throws IOException {
     super(scorer);
+    this.segmentReadState = state;
     int versionMeta = readMetadata(state);
     boolean success = false;
     try {
@@ -314,6 +316,22 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
         target);
   }
 
+  /**
+   * Default reader is opened with IOContext as read with random access. This optimizes searches
+   * with madvise as RANDOM. For merges we need sequential access and ability to preload pages,
+   * IOContext.READONCE gives sequential advise to the kernel which will preload the pages heavily
+   * and discard them once accessed
+   */
+  @Override
+  public FlatVectorsReader getMergeInstance() {
+    try {
+      return new MergeLucene99FlatVectorsReader(this);
+    } catch (IOException e) {
+      // Throwing for testing purposes, we can return existing instance once the testing is done
+      throw new RuntimeException(e);
+    }
+  }
+
   @Override
   public void close() throws IOException {
     IOUtils.close(vectorData);
@@ -347,6 +365,67 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
     @Override
     public long ramBytesUsed() {
       return SHALLOW_SIZE + RamUsageEstimator.sizeOf(ordToDoc);
+    }
+  }
+
+  private static final class MergeLucene99FlatVectorsReader extends FlatVectorsReader {
+
+    private final Lucene99FlatVectorsReader delegate;
+
+    MergeLucene99FlatVectorsReader(final Lucene99FlatVectorsReader flatVectorsReader)
+        throws IOException {
+      super(flatVectorsReader.vectorScorer);
+      this.delegate = flatVectorsReader;
+      this.delegate.vectorData.updateIOContext(IOContext.READONCE);
+    }
+
+    @Override
+    public RandomVectorScorer getRandomVectorScorer(String field, float[] target)
+        throws IOException {
+      return delegate.getRandomVectorScorer(field, target);
+    }
+
+    @Override
+    public RandomVectorScorer getRandomVectorScorer(String field, byte[] target)
+        throws IOException {
+      return delegate.getRandomVectorScorer(field, target);
+    }
+
+    @Override
+    public void checkIntegrity() throws IOException {
+      delegate.checkIntegrity();
+    }
+
+    @Override
+    public FloatVectorValues getFloatVectorValues(String field) throws IOException {
+      return delegate.getFloatVectorValues(field);
+    }
+
+    @Override
+    public ByteVectorValues getByteVectorValues(String field) throws IOException {
+      return delegate.getByteVectorValues(field);
+    }
+
+    @Override
+    public void close() throws IOException {
+      delegate.close();
+    }
+
+    /**
+     * Optional: closing resources after merge. Reset to previous state after merge
+     *
+     * <p>The default implementation is empty
+     */
+    public void finishMerge() throws IOException {
+      // This makes sure that the access pattern hint is reverted back since HNSW implementation
+      // needs it
+      delegate.vectorData.updateIOContext(IOContext.RANDOM);
+      delegate.close();
+    }
+
+    @Override
+    public long ramBytesUsed() {
+      return delegate.ramBytesUsed();
     }
   }
 }

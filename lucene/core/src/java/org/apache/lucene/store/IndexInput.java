@@ -185,4 +185,12 @@ public abstract class IndexInput extends DataInput implements Closeable {
       };
     }
   }
+
+  /**
+   * Optional method: Give a hint to this input about the change in read access pattern. IndexInput
+   * implementations may take advantage of this hint to optimize reads from the storage
+   *
+   * <p>The default implementation is a no-op.
+   */
+  public void updateIOContext(IOContext ioContext) throws IOException {}
 }

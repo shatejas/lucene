@@ -101,4 +101,21 @@ public abstract class FlatVectorsReader implements Closeable, Accountable {
    * never {@code null}.
    */
   public abstract ByteVectorValues getByteVectorValues(String field) throws IOException;
+
+  /**
+   * Returns an instance optimized for merging. This instance may only be consumed in the thread
+   * that called {@link #getMergeInstance()}.
+   *
+   * <p>The default implementation returns {@code this}
+   */
+  public FlatVectorsReader getMergeInstance() {
+    return this;
+  }
+
+  /**
+   * Optional: closing resources after merge. Reset to previous state after merge
+   *
+   * <p>The default implementation is empty
+   */
+  public void finishMerge() throws IOException {}
 }

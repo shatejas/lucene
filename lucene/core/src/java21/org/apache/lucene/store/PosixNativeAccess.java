@@ -51,6 +51,7 @@ final class PosixNativeAccess extends NativeAccess {
   public static final int POSIX_MADV_DONTNEED = 4;
 
   private static final MethodHandle MH$posix_madvise;
+  private static final int PAGE_SIZE;
 
   private static final Optional<NativeAccess> INSTANCE;
 
@@ -63,14 +64,16 @@ final class PosixNativeAccess extends NativeAccess {
   static {
     MethodHandle adviseHandle = null;
     PosixNativeAccess instance = null;
+    int pagesize = -1;
     try {
       adviseHandle = lookupMadvise();
+      pagesize = (int) lookupGetPageSize().invokeExact();
       instance = new PosixNativeAccess();
     } catch (UnsupportedOperationException uoe) {
       LOG.warning(uoe.getMessage());
     } catch (
         @SuppressWarnings("unused")
-        IllegalCallerException ice) {
+        Throwable ice) {
       LOG.warning(
           String.format(
               Locale.ENGLISH,
@@ -81,6 +84,7 @@ final class PosixNativeAccess extends NativeAccess {
     }
     MH$posix_madvise = adviseHandle;
     INSTANCE = Optional.ofNullable(instance);
+    PAGE_SIZE = pagesize;
   }
 
   private static MethodHandle lookupMadvise() {
@@ -95,6 +99,12 @@ final class PosixNativeAccess extends NativeAccess {
             ValueLayout.ADDRESS,
             ValueLayout.JAVA_LONG,
             ValueLayout.JAVA_INT));
+  }
+
+  private static MethodHandle lookupGetPageSize() {
+    final Linker linker = Linker.nativeLinker();
+    final SymbolLookup stdlib = linker.defaultLookup();
+    return findFunction(linker, stdlib, "getpagesize", FunctionDescriptor.of(ValueLayout.JAVA_INT));
   }
 
   private static MethodHandle findFunction(
@@ -149,5 +159,10 @@ final class PosixNativeAccess extends NativeAccess {
       return POSIX_MADV_SEQUENTIAL;
     }
     return null;
+  }
+
+  @Override
+  public int getPageSize() {
+    return PAGE_SIZE;
   }
 }
