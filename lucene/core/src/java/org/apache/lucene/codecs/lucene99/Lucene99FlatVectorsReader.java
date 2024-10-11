@@ -58,10 +58,12 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
 
   private final Map<String, FieldEntry> fields = new HashMap<>();
   private final IndexInput vectorData;
+  private final SegmentReadState segmentReadState;
 
   public Lucene99FlatVectorsReader(SegmentReadState state, FlatVectorsScorer scorer)
       throws IOException {
     super(scorer);
+    this.segmentReadState = state;
     int versionMeta = readMetadata(state);
     boolean success = false;
     try {
@@ -312,6 +314,44 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
             fieldEntry.vectorDataLength,
             vectorData),
         target);
+  }
+
+  /**
+   * Default reader is opened with IOContext as read with random access. This optimizes searches
+   * with madvise as RANDOM. For merges we need sequential access and ability to preload pages,
+   * IOContext.READONCE gives sequential advise to the kernel which will preload the pages heavily
+   * and discard them once accessed
+   */
+  @Override
+  public FlatVectorsReader getMergeInstance() {
+    try {
+      return new Lucene99FlatVectorsReader(this, IOContext.READONCE);
+    } catch (IOException e) {
+      // Throwing for testing purposes, we can return existing instance once the testing is done
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Lucene99FlatVectorsReader(
+      final Lucene99FlatVectorsReader flatVectorsReader, final IOContext ioContext)
+      throws IOException {
+    super(flatVectorsReader.getFlatVectorScorer());
+    this.segmentReadState = flatVectorsReader.segmentReadState;
+    boolean success = false;
+    try {
+      this.vectorData =
+          openDataInput(
+              flatVectorsReader.segmentReadState,
+              readMetadata(flatVectorsReader.segmentReadState),
+              Lucene99FlatVectorsFormat.VECTOR_DATA_EXTENSION,
+              Lucene99FlatVectorsFormat.VECTOR_DATA_CODEC_NAME,
+              ioContext);
+      success = true;
+    } finally {
+      if (success == false) {
+        IOUtils.closeWhileHandlingException(this);
+      }
+    }
   }
 
   @Override

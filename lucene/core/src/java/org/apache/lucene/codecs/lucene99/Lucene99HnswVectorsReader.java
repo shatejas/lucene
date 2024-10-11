@@ -72,6 +72,8 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
   private final IndexInput vectorIndex;
   private final FlatVectorsReader flatVectorsReader;
 
+  // private final SegmentReadState segmentReadState;
+
   public Lucene99HnswVectorsReader(SegmentReadState state, FlatVectorsReader flatVectorsReader)
       throws IOException {
     this.flatVectorsReader = flatVectorsReader;
@@ -112,6 +114,33 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
       }
     }
   }
+
+  /*
+  private Lucene99HnswVectorsReader(
+      Lucene99HnswVectorsReader lucene99HnswVectorsReader, FlatVectorsReader flatVectorsReader)
+      throws IOException {
+    this.flatVectorsReader = flatVectorsReader;
+    this.fieldInfos = lucene99HnswVectorsReader.fieldInfos;
+    this.vectorIndex = lucene99HnswVectorsReader.vectorIndex;
+    this.segmentReadState = lucene99HnswVectorsReader.segmentReadState;
+
+    String metaFileName =
+        IndexFileNames.segmentFileName(
+            segmentReadState.segmentInfo.name,
+            segmentReadState.segmentSuffix,
+            Lucene99HnswVectorsFormat.META_EXTENSION);
+    try (ChecksumIndexInput meta =
+        segmentReadState.directory.openChecksumInput(metaFileName, segmentReadState.context)) {
+      Throwable priorE = null;
+      try {
+        readFields(meta, segmentReadState.fieldInfos);
+      } catch (Throwable exception) {
+        priorE = exception;
+      } finally {
+        CodecUtil.checkFooter(meta, priorE);
+      }
+    }
+  } */
 
   private static IndexInput openDataInput(
       SegmentReadState state,
@@ -219,6 +248,16 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
               + info.getVectorSimilarityFunction());
     }
     return new FieldEntry(input, vectorEncoding, info.getVectorSimilarityFunction());
+  }
+
+  @Override
+  public KnnVectorsReader getMergeInstance() {
+    /*try {
+      return new Lucene99HnswVectorsReader(this, this.flatVectorsReader.getMergeInstance());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }*/
+    return this;
   }
 
   @Override
