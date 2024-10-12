@@ -222,4 +222,13 @@ public abstract class IndexInput extends DataInput implements Closeable {
    * @param length the number of bytes to prefetch
    */
   public void prefetch(long offset, long length) throws IOException {}
+
+  /**
+   * Optional method: Give a hint to this input that all bytes will be read sequentially IndexInput
+   * implementations may take advantage of this hint to start fetching pages of data immediately
+   * from storage.
+   *
+   * <p>The default implementation is a no-op.
+   */
+  public void prefetchSequential() throws IOException {}
 }

@@ -328,8 +328,18 @@ abstract class MemorySegmentIndexInput extends IndexInput
     }
   }
 
+  public void prefetchSequential() throws IOException {
+    for (MemorySegment seg : segments) {
+      prefetch(0, seg.byteSize(), ReadAdvice.SEQUENTIAL);
+    }
+  }
+
   @Override
   public void prefetch(long offset, long length) throws IOException {
+    prefetch(offset, length, ReadAdvice.WILL_NEED);
+  }
+
+  private void prefetch(long offset, long length, ReadAdvice readAdvice) throws IOException {
     if (NATIVE_ACCESS.isEmpty()) {
       return;
     }
@@ -354,7 +364,7 @@ abstract class MemorySegmentIndexInput extends IndexInput
           if (segment.isLoaded() == false) {
             // We have a cache miss on at least one page, let's reset the counter.
             consecutivePrefetchHitCount = 0;
-            nativeAccess.madviseWillNeed(segment);
+            nativeAccess.madvise(segment, readAdvice);
           }
         });
   }

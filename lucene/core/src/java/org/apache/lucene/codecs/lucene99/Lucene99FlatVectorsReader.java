@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.codecs.CodecUtil;
+import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.hnsw.FlatVectorsReader;
 import org.apache.lucene.codecs.hnsw.FlatVectorsScorer;
 import org.apache.lucene.codecs.lucene95.OffHeapByteVectorValues;
@@ -56,15 +57,17 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
   private static final long SHALLOW_SIZE =
       RamUsageEstimator.shallowSizeOfInstance(Lucene99FlatVectorsFormat.class);
 
-  private final Map<String, FieldEntry> fields = new HashMap<>();
+  private final Map<String, FieldEntry> fields;
   private final IndexInput vectorData;
 
   public Lucene99FlatVectorsReader(SegmentReadState state, FlatVectorsScorer scorer)
       throws IOException {
     super(scorer);
+    fields = new HashMap<>();
     int versionMeta = readMetadata(state);
     boolean success = false;
     try {
+
       vectorData =
           openDataInput(
               state,
@@ -80,6 +83,13 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
         IOUtils.closeWhileHandlingException(this);
       }
     }
+  }
+
+  private Lucene99FlatVectorsReader(final Lucene99FlatVectorsReader reader) throws IOException {
+    super(reader.getFlatVectorScorer());
+    this.fields = reader.fields;
+    this.vectorData = reader.vectorData.clone();
+    this.vectorData.prefetchSequential();
   }
 
   private int readMetadata(SegmentReadState state) throws IOException {
@@ -261,6 +271,15 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
             fieldEntry.vectorDataLength,
             vectorData),
         target);
+  }
+
+  @Override
+  public KnnVectorsReader getMergeInstance() {
+    try {
+      return new Lucene99FlatVectorsReader(this);
+    } catch (IOException exception) {
+      throw new RuntimeException(exception);
+    }
   }
 
   @Override

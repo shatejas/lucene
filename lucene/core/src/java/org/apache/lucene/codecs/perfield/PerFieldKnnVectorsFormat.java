@@ -233,6 +233,12 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
       }
     }
 
+    private FieldsReader(final FieldsReader fieldsReader) {
+      for (Map.Entry<String, KnnVectorsReader> perFieldEntry : fieldsReader.fields.entrySet()) {
+        this.fields.put(perFieldEntry.getKey(), perFieldEntry.getValue().getMergeInstance());
+      }
+    }
+
     /**
      * Return the underlying VectorReader for the given field
      *
@@ -284,6 +290,11 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
     @Override
     public void close() throws IOException {
       IOUtils.close(fields.values());
+    }
+
+    @Override
+    public KnnVectorsReader getMergeInstance() {
+      return new FieldsReader(this);
     }
   }
 

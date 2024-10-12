@@ -70,11 +70,12 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
 
   private final FlatVectorsReader flatVectorsReader;
   private final FieldInfos fieldInfos;
-  private final Map<String, FieldEntry> fields = new HashMap<>();
+  private final Map<String, FieldEntry> fields;
   private final IndexInput vectorIndex;
 
   public Lucene99HnswVectorsReader(SegmentReadState state, FlatVectorsReader flatVectorsReader)
       throws IOException {
+    this.fields = new HashMap<>();
     this.flatVectorsReader = flatVectorsReader;
     boolean success = false;
     this.fieldInfos = state.fieldInfos;
@@ -112,6 +113,15 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
         IOUtils.closeWhileHandlingException(this);
       }
     }
+  }
+
+  private Lucene99HnswVectorsReader(
+      Lucene99HnswVectorsReader lucene99HnswVectorsReader, KnnVectorsReader flatVectorsReader) {
+    assert flatVectorsReader instanceof FlatVectorsReader;
+    this.flatVectorsReader = (FlatVectorsReader) flatVectorsReader;
+    this.fieldInfos = lucene99HnswVectorsReader.fieldInfos;
+    this.fields = lucene99HnswVectorsReader.fields;
+    this.vectorIndex = lucene99HnswVectorsReader.vectorIndex.clone();
   }
 
   private static IndexInput openDataInput(
@@ -228,6 +238,11 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
         + RamUsageEstimator.sizeOfMap(
             fields, RamUsageEstimator.shallowSizeOfInstance(FieldEntry.class))
         + flatVectorsReader.ramBytesUsed();
+  }
+
+  @Override
+  public KnnVectorsReader getMergeInstance() {
+    return new Lucene99HnswVectorsReader(this, this.flatVectorsReader.getMergeInstance());
   }
 
   @Override
