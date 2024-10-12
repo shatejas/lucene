@@ -40,5 +40,7 @@ public enum ReadAdvice {
    * loads the content of the file into the page cache at open time. This should only be used on
    * very small files that can be expected to fit in RAM with very high confidence.
    */
-  RANDOM_PRELOAD
+  RANDOM_PRELOAD,
+
+  WILL_NEED
 }

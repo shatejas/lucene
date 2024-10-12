@@ -18,6 +18,7 @@ package org.apache.lucene.store;
 
 import static org.apache.lucene.store.ReadAdvice.RANDOM;
 import static org.apache.lucene.store.ReadAdvice.SEQUENTIAL;
+import static org.apache.lucene.store.ReadAdvice.WILL_NEED;
 
 import java.io.IOException;
 import java.lang.foreign.FunctionDescriptor;
@@ -167,6 +168,11 @@ final class PosixNativeAccess extends NativeAccess {
     if (readAdvice == SEQUENTIAL) {
       return POSIX_MADV_SEQUENTIAL;
     }
+
+    if (readAdvice == WILL_NEED) {
+      return POSIX_MADV_WILLNEED;
+    }
+
     return null;
   }
 

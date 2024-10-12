@@ -313,8 +313,28 @@ abstract class MemorySegmentIndexInput extends IndexInput
     }
   }
 
+  public void prefetchSequential() throws IOException {
+    if (NATIVE_ACCESS.isEmpty()) {
+      return;
+    }
+
+    long offset = 0;
+    for (MemorySegment seg : segments) {
+      prefetch(offset, seg.byteSize(), ReadAdvice.SEQUENTIAL);
+      offset += seg.byteSize();
+    }
+  }
+
   @Override
   public void prefetch(long offset, long length) throws IOException {
+    prefetch(offset, length, ReadAdvice.WILL_NEED);
+  }
+
+  private void prefetch(long offset, long length, ReadAdvice readAdvice) throws IOException {
+    if (NATIVE_ACCESS.isEmpty()) {
+      return;
+    }
+
     ensureOpen();
 
     Objects.checkFromIndexSize(offset, length, length());
@@ -345,7 +365,7 @@ abstract class MemorySegmentIndexInput extends IndexInput
       }
 
       final MemorySegment prefetchSlice = segment.asSlice(offset, length);
-      nativeAccess.madviseWillNeed(prefetchSlice);
+      nativeAccess.madvise(prefetchSlice, readAdvice);
     } catch (
         @SuppressWarnings("unused")
         IndexOutOfBoundsException e) {

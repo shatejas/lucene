@@ -56,7 +56,7 @@ public class IOContext {
 
   public static final IOContext RANDOM = new IOContext(ReadAdvice.RANDOM);
 
-  private IOContext(
+  public IOContext(
       Context context, MergeInfo mergeInfo, FlushInfo flushInfo, ReadAdvice readAdvice) {
     Objects.requireNonNull(context, "context must not be null");
     Objects.requireNonNull(readAdvice, "readAdvice must not be null");

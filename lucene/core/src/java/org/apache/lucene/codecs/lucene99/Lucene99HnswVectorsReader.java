@@ -69,7 +69,7 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
       RamUsageEstimator.shallowSizeOfInstance(Lucene99HnswVectorsFormat.class);
 
   private final FieldInfos fieldInfos;
-  private final Map<String, FieldEntry> fields = new HashMap<>();
+  private final Map<String, FieldEntry> fields;
   private final IndexInput vectorIndex;
   private final FlatVectorsReader flatVectorsReader;
 
@@ -77,6 +77,7 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
 
   public Lucene99HnswVectorsReader(SegmentReadState state, FlatVectorsReader flatVectorsReader)
       throws IOException {
+    this.fields = new HashMap<>();
     this.flatVectorsReader = flatVectorsReader;
     boolean success = false;
     this.fieldInfos = state.fieldInfos;
@@ -116,32 +117,13 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
     }
   }
 
-  /*
   private Lucene99HnswVectorsReader(
-      Lucene99HnswVectorsReader lucene99HnswVectorsReader, FlatVectorsReader flatVectorsReader)
-      throws IOException {
+      Lucene99HnswVectorsReader lucene99HnswVectorsReader, FlatVectorsReader flatVectorsReader) {
     this.flatVectorsReader = flatVectorsReader;
     this.fieldInfos = lucene99HnswVectorsReader.fieldInfos;
-    this.vectorIndex = lucene99HnswVectorsReader.vectorIndex;
-    this.segmentReadState = lucene99HnswVectorsReader.segmentReadState;
-
-    String metaFileName =
-        IndexFileNames.segmentFileName(
-            segmentReadState.segmentInfo.name,
-            segmentReadState.segmentSuffix,
-            Lucene99HnswVectorsFormat.META_EXTENSION);
-    try (ChecksumIndexInput meta =
-        segmentReadState.directory.openChecksumInput(metaFileName, segmentReadState.context)) {
-      Throwable priorE = null;
-      try {
-        readFields(meta, segmentReadState.fieldInfos);
-      } catch (Throwable exception) {
-        priorE = exception;
-      } finally {
-        CodecUtil.checkFooter(meta, priorE);
-      }
-    }
-  } */
+    this.fields = lucene99HnswVectorsReader.fields;
+    this.vectorIndex = lucene99HnswVectorsReader.vectorIndex.clone();
+  }
 
   private static IndexInput openDataInput(
       SegmentReadState state,
@@ -252,21 +234,16 @@ public final class Lucene99HnswVectorsReader extends KnnVectorsReader
   }
 
   @Override
-  public KnnVectorsReader getMergeInstance() {
-    /*try {
-      return new Lucene99HnswVectorsReader(this, this.flatVectorsReader.getMergeInstance());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }*/
-    return this;
-  }
-
-  @Override
   public long ramBytesUsed() {
     return Lucene99HnswVectorsReader.SHALLOW_SIZE
         + RamUsageEstimator.sizeOfMap(
             fields, RamUsageEstimator.shallowSizeOfInstance(FieldEntry.class))
         + flatVectorsReader.ramBytesUsed();
+  }
+
+  @Override
+  public KnnVectorsReader getMergeInstance() {
+    return new Lucene99HnswVectorsReader(this, this.flatVectorsReader.getMergeInstance());
   }
 
   @Override

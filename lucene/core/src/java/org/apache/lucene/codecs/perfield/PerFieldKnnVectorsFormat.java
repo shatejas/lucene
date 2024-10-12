@@ -288,13 +288,13 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
     }
 
     @Override
-    public KnnVectorsReader getMergeInstance() {
-      return new FieldsReader(this);
+    public void close() throws IOException {
+      IOUtils.close(fields.values());
     }
 
     @Override
-    public void close() throws IOException {
-      IOUtils.close(fields.values());
+    public KnnVectorsReader getMergeInstance() {
+      return new FieldsReader(this);
     }
 
     @Override

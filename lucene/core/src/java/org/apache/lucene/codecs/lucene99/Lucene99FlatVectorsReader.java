@@ -57,17 +57,17 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
   private static final long SHALLOW_SIZE =
       RamUsageEstimator.shallowSizeOfInstance(Lucene99FlatVectorsFormat.class);
 
-  private final Map<String, FieldEntry> fields = new HashMap<>();
+  private final Map<String, FieldEntry> fields;
   private final IndexInput vectorData;
-  private final SegmentReadState segmentReadState;
 
   public Lucene99FlatVectorsReader(SegmentReadState state, FlatVectorsScorer scorer)
       throws IOException {
     super(scorer);
-    this.segmentReadState = state;
+    fields = new HashMap<>();
     int versionMeta = readMetadata(state);
     boolean success = false;
     try {
+
       vectorData =
           openDataInput(
               state,
@@ -83,6 +83,14 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
         IOUtils.closeWhileHandlingException(this);
       }
     }
+  }
+
+  private Lucene99FlatVectorsReader(final Lucene99FlatVectorsReader reader) throws IOException {
+    super(reader.getFlatVectorScorer());
+    this.fields = reader.fields;
+    this.vectorData = reader.vectorData.clone();
+    this.vectorData.seek(0);
+    this.vectorData.prefetchSequential();
   }
 
   private int readMetadata(SegmentReadState state) throws IOException {
@@ -326,32 +334,9 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
   @Override
   public FlatVectorsReader getMergeInstance() {
     try {
-      return new Lucene99FlatVectorsReader(this, IOContext.READONCE);
-    } catch (IOException e) {
-      // Throwing for testing purposes, we can return existing instance once the testing is done
-      throw new RuntimeException(e);
-    }
-  }
-
-  private Lucene99FlatVectorsReader(
-      final Lucene99FlatVectorsReader flatVectorsReader, final IOContext ioContext)
-      throws IOException {
-    super(flatVectorsReader.getFlatVectorScorer());
-    this.segmentReadState = flatVectorsReader.segmentReadState;
-    boolean success = false;
-    try {
-      this.vectorData =
-          openDataInput(
-              flatVectorsReader.segmentReadState,
-              readMetadata(flatVectorsReader.segmentReadState),
-              Lucene99FlatVectorsFormat.VECTOR_DATA_EXTENSION,
-              Lucene99FlatVectorsFormat.VECTOR_DATA_CODEC_NAME,
-              ioContext);
-      success = true;
-    } finally {
-      if (success == false) {
-        IOUtils.closeWhileHandlingException(this);
-      }
+      return new Lucene99FlatVectorsReader(this);
+    } catch (IOException exception) {
+      throw new RuntimeException(exception);
     }
   }
 
