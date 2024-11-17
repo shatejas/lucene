@@ -186,7 +186,7 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
   /** VectorReader that can wrap multiple delegate readers, selected by field. */
   public static class FieldsReader extends KnnVectorsReader {
 
-    private final Map<String, KnnVectorsReader> fields = new HashMap<>();
+    private final Map<String, KnnVectorsReader> fields;
 
     /**
      * Create a FieldsReader over a segment, opening VectorReaders for each KnnVectorsFormat
@@ -199,6 +199,7 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
 
       // Init each unique format:
       boolean success = false;
+      fields = new HashMap<>();
       Map<String, KnnVectorsReader> formats = new HashMap<>();
       try {
         // Read field name -> format name
@@ -230,6 +231,22 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
         if (!success) {
           IOUtils.closeWhileHandlingException(formats.values());
         }
+      }
+    }
+
+    private FieldsReader(final FieldsReader fieldsReader) {
+      this.fields = fieldsReader.fields;
+    }
+
+    @Override
+    public KnnVectorsReader getMergeInstance() {
+      return new FieldsReader(this);
+    }
+
+    @Override
+    public void finishMerge() throws IOException {
+      for (KnnVectorsReader knnVectorReader : fields.values()) {
+        knnVectorReader.finishMerge();
       }
     }
 

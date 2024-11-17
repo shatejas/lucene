@@ -21,6 +21,7 @@ import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readSi
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.codecs.CodecUtil;
@@ -222,6 +223,24 @@ public final class Lucene99FlatVectorsReader extends FlatVectorsReader {
     return Lucene99FlatVectorsReader.SHALLOW_SIZE
         + RamUsageEstimator.sizeOfMap(
             fields, RamUsageEstimator.shallowSizeOfInstance(FieldEntry.class));
+  }
+
+  @Override
+  public FlatVectorsReader getMergeInstance() {
+    try {
+      // Update the read advice since vectors are guaranteed to be accessed sequentially for merge
+      this.vectorData.updateReadAdvice(ReadAdvice.SEQUENTIAL);
+      return this;
+    } catch (IOException exception) {
+      throw new UncheckedIOException(exception);
+    }
+  }
+
+  @Override
+  public void finishMerge() throws IOException {
+    // This makes sure that the access pattern hint is reverted back since HNSW implementation
+    // needs it
+    this.vectorData.updateReadAdvice(ReadAdvice.RANDOM);
   }
 
   @Override

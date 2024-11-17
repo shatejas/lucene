@@ -124,4 +124,11 @@ public abstract class KnnVectorsReader implements Closeable, Accountable {
   public KnnVectorsReader getMergeInstance() {
     return this;
   }
+
+  /**
+   * Optional: reset or close merge resources used in the reader
+   *
+   * <p>The default implementation is empty
+   */
+  public void finishMerge() throws IOException {}
 }
